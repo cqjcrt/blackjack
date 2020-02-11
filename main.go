@@ -89,10 +89,11 @@ func main() {
 	g.spots[0].player = &Player{Name: "jon"}
 	g.deal()
 	g.hit(0)
+	g.hit(0)
 	g.stand(0)
 	g.finish()
 	g.settle()
-	fmt.Println(g)
+	// fmt.Println(g)
 
 	http.HandleFunc("/hello", hello)
 	http.HandleFunc("/", home)
@@ -225,7 +226,6 @@ func (g *Game) finish() {
 
 	// only draw is there are spots in Stand status
 	for _, s := range g.spots {
-		// fmt.Printf("%v\n", s)
 		if s.player != nil && s.status == Stand {
 			dealerDraws = true
 		}
@@ -237,7 +237,7 @@ func (g *Game) finish() {
 	}
 
 	// TODO: handle soft 17
-	for count(g.dealer.hand) <= 17 && isSoft(g.dealer.hand) {
+	for count(g.dealer.hand) < 17 || (isSoft(g.dealer.hand) && count(g.dealer.hand) == 17) {
 		c := g.shoe.draw()
 		g.dealer.hand = append(g.dealer.hand, c)
 		log.Printf("Dealer draws a %s for a hand of %s (%d)\n", c, g.dealer.hand, count(g.dealer.hand))
@@ -266,11 +266,11 @@ func (g *Game) settle() {
 			if sp.status == Stand {
 				if count(sp.hand) <= 21 && dealerCount <= 21 && count(sp.hand) > dealerCount {
 					// player win
-					log.Printf("Player wins with %s against %s\n", sp.hand, g.dealer.hand)
+					log.Printf("Player wins with %s (%d) against %s (%d)\n", sp.hand, count(sp.hand), g.dealer.hand, dealerCount)
 					// credit
 				} else {
 					// player lose
-					log.Printf("Player loses with %s against %s\n", sp.hand, g.dealer.hand)
+					log.Printf("Player loses with %s (%d) against %s (%d)\n", sp.hand, count(sp.hand), g.dealer.hand, dealerCount)
 					// debit
 				}
 			} else if sp.status == Busted {
@@ -287,6 +287,11 @@ func (g *Game) settleBlackjack() {
 }
 
 func (g *Game) hit(i int) {
+	if g.spots[i].status != Ready {
+		log.Printf("Player %s cannot hit with %s (%v)\n", g.spots[i].player.Name, g.spots[i].hand, g.spots[i].status)
+		return
+	}
+
 	c := g.shoe.draw()
 	g.spots[i].hand = append(g.spots[i].hand, c)
 
