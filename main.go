@@ -86,7 +86,8 @@ type Deck struct {
 func main() {
 	g := &Game{}
 	g.init()
-	g.spots[0].player = &Player{Name: "jon"}
+	g.spots[0].wager = 25
+	g.spots[0].player = &Player{Name: "jon", bankroll: 1000}
 	g.deal()
 	g.hit(0)
 	g.hit(0)
@@ -184,6 +185,7 @@ func (g *Game) init() {
 
 	spots := make([]Spot, 6)
 	g.spots = spots
+	g.dealer.bankroll = 50000
 }
 
 func (g *Game) deal() {
@@ -261,29 +263,49 @@ func (g *Game) String() string {
 func (g *Game) settle() {
 	dealerCount := count(g.dealer.hand)
 	// compare each spot against dealer hand
-	for _, sp := range g.spots {
+	for i, sp := range g.spots {
 		if sp.player != nil {
 			if sp.status == Stand {
 				if count(sp.hand) <= 21 && dealerCount <= 21 && count(sp.hand) > dealerCount {
 					// player win
 					log.Printf("Player wins with %s (%d) against %s (%d)\n", sp.hand, count(sp.hand), g.dealer.hand, dealerCount)
 					// credit
+					g.playerWins(i, false)
 				} else {
 					// player lose
 					log.Printf("Player loses with %s (%d) against %s (%d)\n", sp.hand, count(sp.hand), g.dealer.hand, dealerCount)
 					// debit
+					g.playerLoses(i)
 				}
 			} else if sp.status == Busted {
-
+				// player busted, debit
+				g.playerLoses(i)
 			}
-
-			// player busted, debit
 		}
 	}
 }
 
 func (g *Game) settleBlackjack() {
 	// payout player 3 to 2
+}
+
+func (g *Game) playerWins(i int, blackjack bool) {
+	// TODO: synchronize?
+	wager := g.spots[i].wager
+	if blackjack {
+		wager *= 2 // TODO: handle floating point 3:2
+	}
+	g.spots[i].player.bankroll += wager
+	g.dealer.bankroll -= wager
+	log.Printf("Player %s wins %d. (Bankroll %d)\n", g.spots[i].player.Name, wager, g.spots[i].player.bankroll)
+
+}
+
+func (g *Game) playerLoses(i int) {
+	// TODO: synchronize?
+	g.spots[i].player.bankroll -= g.spots[i].wager
+	g.dealer.bankroll += g.spots[i].wager
+	log.Printf("Player %s loses %d. (Bankroll %d)\n", g.spots[i].player.Name, g.spots[i].wager, g.spots[i].player.bankroll)
 }
 
 func (g *Game) hit(i int) {
