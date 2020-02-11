@@ -51,7 +51,7 @@ type Game struct {
 	shoe    Deck
 	discard []Card
 	dealer  Dealer
-	spots   *[]Spot
+	spots   []Spot
 	status  GameStatus
 	turn    GameTurn
 }
@@ -71,6 +71,7 @@ const (
 	Ready SpotStatus = iota
 	Stand
 	Busted
+	Done
 )
 
 type Card struct {
@@ -87,9 +88,11 @@ func main() {
 	g.init()
 	g.spots[0].player = &Player{Name: "jon"}
 	g.deal()
-	fmt.Println(g.shoe)
+	g.hit(0)
+	g.stand(0)
+	g.finish()
+	g.settle()
 	fmt.Println(g)
-	fmt.Println("*****")
 
 	http.HandleFunc("/hello", hello)
 	http.HandleFunc("/", home)
@@ -142,7 +145,6 @@ func (d *Deck) init() {
 			i++
 		}
 	}
-	fmt.Println(d.cards)
 }
 
 func (d *Deck) shuffle() {
@@ -180,43 +182,37 @@ func (g *Game) init() {
 	g.shoe = *d
 
 	spots := make([]Spot, 6)
-	g.spots = &spots
+	g.spots = spots
 }
 
 func (g *Game) deal() {
 	// check state of game
 	// debit wager from player cash
 	// deal 1 card to each occupied spot
-	for _, sp := range *g.spots {
-		fmt.Printf("sp is %v\n", sp)
+	for i, sp := range g.spots {
 		if sp.player != nil {
-			fmt.Printf("before: %s", sp.hand)
-			sp.hand = append(sp.hand, g.shoe.draw())
-			fmt.Printf("after: %s", sp.hand)
+			c := g.shoe.draw()
+			g.spots[i].hand = append(g.spots[i].hand, c)
+			log.Printf("Player %s draws a %s to hold %s\n", sp.player.Name, c, g.spots[i].hand)
 		}
 	}
 	// deal to dealer
-	fmt.Println("daeler")
-	fmt.Println(g.dealer)
-	fmt.Println(g.dealer.hand)
-	fmt.Println(g.shoe)
-	g.dealer.hand = append(g.dealer.hand, g.shoe.draw())
+	c := g.shoe.draw()
+	g.dealer.hand = append(g.dealer.hand, c)
+	log.Printf("Dealer draws a %s for a hand of %s\n", c, g.dealer.hand)
 
 	// deal 1 card to each occupied spot
-	for _, sp := range *g.spots {
-		fmt.Println("sp is %s", sp)
+	for i, sp := range g.spots {
 		if sp.player != nil {
-			fmt.Printf("before: %s", sp.hand)
-			sp.hand = append(sp.hand, g.shoe.draw())
-			fmt.Printf("after: %s", sp.hand)
+			c := g.shoe.draw()
+			g.spots[i].hand = append(g.spots[i].hand, c)
+			log.Printf("Player %s draws a %s to hold %s\n", sp.player.Name, c, g.spots[i].hand)
 		}
 	}
 	// deal to dealer
-	fmt.Println("daeler")
-	fmt.Println(g.dealer)
-	fmt.Println(g.dealer.hand)
-	fmt.Println(g.shoe)
-	g.dealer.hand = append(g.dealer.hand, g.shoe.draw())
+	c = g.shoe.draw()
+	g.dealer.hand = append(g.dealer.hand, c)
+	log.Printf("Dealer draws a %s for a hand of %s\n", c, g.dealer.hand)
 
 	// set status to PlayerTurn
 	// check for dealer blackjack
@@ -224,11 +220,37 @@ func (g *Game) deal() {
 	// check for player blackjack
 }
 
+func (g *Game) finish() {
+	var dealerDraws bool
+
+	// only draw is there are spots in Stand status
+	for _, s := range g.spots {
+		// fmt.Printf("%v\n", s)
+		if s.player != nil && s.status == Stand {
+			dealerDraws = true
+		}
+	}
+
+	if !dealerDraws {
+		log.Printf("No active hands remain. Dealer doesn't need to draw")
+		return
+	}
+
+	// TODO: handle soft 17
+	for count(g.dealer.hand) <= 17 && isSoft(g.dealer.hand) {
+		c := g.shoe.draw()
+		g.dealer.hand = append(g.dealer.hand, c)
+		log.Printf("Dealer draws a %s for a hand of %s (%d)\n", c, g.dealer.hand, count(g.dealer.hand))
+	}
+
+	// check if all spots are won, stand, busted
+}
+
 func (g *Game) String() string {
 	var s strings.Builder
 	s.WriteString(fmt.Sprintf("Deck: %s\n", g.shoe))
 	s.WriteString(fmt.Sprintf("Dealer: %s\n", g.dealer.hand))
-	for _, sp := range *g.spots {
+	for _, sp := range g.spots {
 		if sp.player != nil {
 			s.WriteString(fmt.Sprintf("Player %s: %s\n", sp.player.Name, sp.hand))
 		}
@@ -237,13 +259,97 @@ func (g *Game) String() string {
 }
 
 func (g *Game) settle() {
+	dealerCount := count(g.dealer.hand)
 	// compare each spot against dealer hand
-	// if dealer win, credit dealer spot's wager
-	// if dealer lose, credit spot's player with wager
+	for _, sp := range g.spots {
+		if sp.player != nil {
+			if sp.status == Stand {
+				if count(sp.hand) <= 21 && dealerCount <= 21 && count(sp.hand) > dealerCount {
+					// player win
+					log.Printf("Player wins with %s against %s\n", sp.hand, g.dealer.hand)
+					// credit
+				} else {
+					// player lose
+					log.Printf("Player loses with %s against %s\n", sp.hand, g.dealer.hand)
+					// debit
+				}
+			} else if sp.status == Busted {
+
+			}
+
+			// player busted, debit
+		}
+	}
 }
 
 func (g *Game) settleBlackjack() {
 	// payout player 3 to 2
+}
+
+func (g *Game) hit(i int) {
+	c := g.shoe.draw()
+	g.spots[i].hand = append(g.spots[i].hand, c)
+
+	// do evaluate here? check for bust?
+	if count(g.spots[i].hand) > 21 {
+		g.spots[i].status = Busted
+		log.Printf("Player %s busts with %s for a hand of %s\n", g.spots[i].player.Name, c, g.spots[i].hand)
+		return
+	}
+
+	log.Printf("Player %s hits and recieves %s for a hand of %s\n", g.spots[i].player.Name, c, g.spots[i].hand)
+}
+
+func (g *Game) stand(i int) {
+	if g.spots[i].status == Ready {
+		g.spots[i].status = Stand
+		log.Printf("Player %s stands with %s\n", g.spots[i].player.Name, g.spots[i].hand)
+	} else {
+		log.Printf("Player %s cannot stand with %s (%v)\n", g.spots[i].player.Name, g.spots[i].hand, g.spots[i].status)
+	}
+}
+
+func count(hand []Card) int {
+	// TODO: handle soft 17
+	var hasAce bool
+	var count int
+
+	for _, c := range hand {
+		if c.rank > 10 {
+			count += 10
+		} else if c.rank == 1 {
+			hasAce = true
+			count++
+		} else if c.rank > 1 && c.rank <= 10 {
+			count += c.rank
+		}
+	}
+
+	// count an ace as "11"
+	if hasAce && count < 12 {
+		count += 10
+	}
+	return count
+}
+
+func isSoft(hand []Card) bool {
+	// TODO: handle soft 17
+	var hasAce bool
+	var count int
+
+	for _, c := range hand {
+		if c.rank > 10 {
+			count += 10
+		} else if c.rank == 1 {
+			hasAce = true
+			count++
+		} else if c.rank > 1 && c.rank <= 10 {
+			count += c.rank
+		}
+	}
+
+	// count an ace as "11"
+	return hasAce && count < 12
 }
 
 func (c Card) String() string {
