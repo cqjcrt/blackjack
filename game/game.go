@@ -26,9 +26,9 @@ type Spot struct {
 type GameStatus int
 
 const (
-	Start GameStatus = iota
+	GameStart GameStatus = iota
 	PlayerTurn
-	End
+	GameEnd
 )
 
 type GameTurn struct {
@@ -41,7 +41,7 @@ type Game struct {
 	discard []Card
 	dealer  Dealer
 	Spots   []Spot
-	status  GameStatus
+	Status  GameStatus
 	turn    GameTurn
 }
 
@@ -100,7 +100,8 @@ func (g *Game) Deal() {
 	g.dealer.hand = append(g.dealer.hand, c)
 	log.Printf("Dealer draws a %s for a hand of %s\n", c, g.dealer.hand)
 
-	g.dealer.hand = []Card{Card{1, 1}, Card{10, 1}}
+	// force bj
+	// g.dealer.hand = []Card{Card{1, 1}, Card{10, 1}}
 }
 
 func (g *Game) CheckForDealerBlackjack() bool {
@@ -134,7 +135,6 @@ func (g *Game) Finish() {
 			log.Printf("Dealer draws a %s for a hand of %s (%d)\n", c, g.dealer.hand, count(g.dealer.hand))
 		}
 	}
-
 }
 
 func (g *Game) String() string {
@@ -155,7 +155,7 @@ func (g *Game) Settle() {
 	for i, sp := range g.Spots {
 		if sp.Player != nil {
 			playerCount := count(sp.hand)
-			if sp.status == Stand {
+			if g.Status == GameEnd || sp.status == Stand {
 				if dealerCount > 21 || (playerCount <= 21 && playerCount > dealerCount) {
 					// player win
 					log.Printf("Player wins with %s (%d) against %s (%d)\n", sp.hand, playerCount, g.dealer.hand, dealerCount)

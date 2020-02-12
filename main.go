@@ -21,6 +21,7 @@ func main() {
 	g.Spots[0].Player = &game.Player{Name: "jon", Bankroll: 1000}
 	g.Deal()
 	if g.CheckForDealerBlackjack() {
+		g.Status = game.GameEnd
 		g.Finish()
 		g.Settle()
 	} else {
