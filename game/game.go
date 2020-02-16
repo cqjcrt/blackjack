@@ -11,17 +11,29 @@ type Player struct {
 	Bankroll int
 }
 
+type Hand []Card
+
 type Dealer struct {
 	bankroll int
-	hand     []Card
+	hand     Hand
 }
 
 type Spot struct {
-	hand   []Card
+	hands  []Hand
 	Wager  int
 	Player *Player
 	status SpotStatus
+	Next   *Spot
 }
+
+type SpotStatus int
+
+const (
+	Ready SpotStatus = iota
+	Stand
+	Busted
+	Done
+)
 
 type GameStatus int
 
@@ -41,18 +53,11 @@ type Game struct {
 	discard []Card
 	dealer  Dealer
 	Spots   []Spot
+	Head    *Spot
+	Tail    *Spot
 	Status  GameStatus
 	turn    GameTurn
 }
-
-type SpotStatus int
-
-const (
-	Ready SpotStatus = iota
-	Stand
-	Busted
-	Done
-)
 
 func (g *Game) Init() {
 	// create and shuffle deck
@@ -63,6 +68,9 @@ func (g *Game) Init() {
 	g.shoe = *d
 
 	spots := make([]Spot, 6)
+	for i:=0; i++; i < 5 {
+		spots[i].Next = spots[i+1]
+	}
 	g.Spots = spots
 	g.dealer.bankroll = 50000
 }
