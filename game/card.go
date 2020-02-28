@@ -3,22 +3,23 @@ package game
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 )
 
-type Suit int
+type Suit string
 
 const (
-	Spade   Suit = 0
-	Heart   Suit = 1
-	Club    Suit = 2
-	Diamond Suit = 3
+	Spade   Suit = "s"
+	Heart   Suit = "h"
+	Club    Suit = "c"
+	Diamond Suit = "d"
 )
 
 type Card struct {
-	rank int
-	suit Suit
+	Rank string `json:"rank"`
+	Suit Suit   `json:"suit"`
 }
 
 type Deck struct {
@@ -38,7 +39,8 @@ func (s Suit) String() string {
 func (d *Deck) Init() {
 	d.cards = make([]Card, 52)
 	i := 0
-	for r := 1; r < 14; r++ {
+	ranks := []string{"A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"}
+	for _, r := range ranks {
 		for _, s := range []Suit{Spade, Heart, Club, Diamond} {
 			d.cards[i] = Card{r, s}
 			i++
@@ -72,22 +74,23 @@ func (d *Deck) String() string {
 	return s.String()
 }
 
-func (c Card) String() string {
-	var rank string
-	switch c.rank {
-	case 1:
-		rank = "A"
-	case 10:
-		rank = "T"
-	case 11:
-		rank = "J"
-	case 12:
-		rank = "Q"
-	case 13:
-		rank = "K"
+func (c Card) Value() int {
+	var value int
+	switch c.Rank {
+	case "A":
+		value = 1
+	case "T", "J", "Q", "K":
+		value = 10
 	default:
-		rank = fmt.Sprintf("%d", c.rank)
+		var err error
+		value, err = strconv.Atoi(c.Rank)
+		if err != nil {
+			panic("invalid rank " + c.Rank)
+		}
 	}
+	return value
+}
 
-	return fmt.Sprintf("%s%s", rank, c.suit)
+func (c Card) String() string {
+	return fmt.Sprintf("%s%s", c.Rank, c.Suit)
 }
